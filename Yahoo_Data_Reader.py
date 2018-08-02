@@ -1,10 +1,11 @@
 class Yahoo_Reader():
-    	# Create new instance: data = Yahoo_Reader('IBM')
+    # Create new instance: data = Yahoo_Reader('IBM')
 	# Read the instance data: data.read()
 
     def __init__(self, symbol=None, start=None, end=None):
 		import datetime, time
 		from dateutil.relativedelta import relativedelta
+        import pandas as pd
         self.symbol = symbol
         
 		# providing start/end dates if non-available:
@@ -30,6 +31,7 @@ class Yahoo_Reader():
         
     def read(self):
         import requests, re, json
+        import pandas as pd
        
         r = requests.get(self.url)
         
@@ -42,12 +44,13 @@ class Yahoo_Reader():
                 )
         df.insert(0, 'symbol', self.symbol)
         df['date'] = pd.to_datetime(df['date'], unit='s').dt.date
+        df.set_index(u'date',inplace = True)
+        df.index.rename(None, inplace = True)
         
         # drop rows that aren't prices
         df = df.dropna(subset=['close'])
         
-        df = df[['symbol', 'date', 'high', 'low', 'open', 'close', 
-                 'volume', 'adjclose']]
-        df = df.set_index('symbol')
+        df = df[['symbol', 'high', 'low', 'open', 'close', 'volume', 'adjclose']]
+        
         return df
     
