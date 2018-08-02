@@ -1,5 +1,7 @@
 class Yahoo_Reader():
-    
+    	# Create new instance: data = Yahoo_Reader('IBM')
+	# Read the instance data: data.read()
+
     def __init__(self, symbol=None, start=None, end=None):
 		import datetime, time
 		from dateutil.relativedelta import relativedelta
