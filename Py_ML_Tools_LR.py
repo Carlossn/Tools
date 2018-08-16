@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import statsmodels as sm
+    import statsmodels.api as sfm
 %matplotlib inline
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -8,8 +9,8 @@ from scipy import stats
 from statsmodels.graphics.gofplots import ProbPlot
 import warnings
 
-
 ################################# OLS SIMPLE MODEL TOOLS#######################################################################
+
 
 def OLS_Assumption_Tests(x, y):
     '''
@@ -21,7 +22,7 @@ def OLS_Assumption_Tests(x, y):
     '''
 
     # fitting model:
-    model_fit = sm.api.formula.OLS(y, sm.api.add_constant(x)).fit()  # new regression fit as it works with sm.fit() only
+    model_fit = sfm.OLS(y, sfm.add_constant(x)).fit()  # new regression fit as it works with sm.fit() only
     # model residuals
     model_residuals = model_fit.resid
     # TESTS:
@@ -56,7 +57,7 @@ def OLS_Assumptions_Plot(x, y, resid_type='norm'):
     '''
     # Calculations:
     # fitting model:
-    model_fit = sm.formula.api.OLS(y, sm.api.add_constant(x)).fit()  # new regression fit as it works with sm.fit() only
+    model_fit = sfm.OLS(y, sfm.add_constant(x)).fit()  # new regression fit as it works with sm.fit() only
     # calculations required:
     # fitted values (need a constant term for intercept)
     model_fitted_y = model_fit.fittedvalues
@@ -178,16 +179,6 @@ def cook_dist_plot(model_fit):
     Anything outside the group and outside “Cook’s Distance” lines, may have an influential effect on model fit.
 
     '''
-
-    %matplotlib inline
-    import numpy as np
-    import pandas as pd
-    import seaborn as sns
-    import matplotlib.pyplot as plt
-    import statsmodels as sm
-    from scipy import stats
-    from statsmodels.graphics.gofplots import ProbPlot
-    import warnings
 
     # Calculations:
     # calculations required:
