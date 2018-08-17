@@ -5,24 +5,82 @@ import statsmodels.api as sfm
 %matplotlib inline
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from scipy import stats
 from statsmodels.graphics.gofplots import ProbPlot
 import warnings
 import matplotlib.gridspec as gridspec
-import matplotlib as mpl
 
 
 ################################# LR MODEL TOOLS##########################################################
-# Functions:
-# OLS_Assumption_Tests: check OLS model assumptions
-# OLS_Assumptions_Plot: plot OLS model assumptions
+# Functions HELP: import the file and load summary dataframe to check functions available
+############
+# normality_tests: returns key statistics and multiple normality tests p-values for one or more vars
+# OLS_Assumption_Tests: check OLS model assumptions: linearity, normality, homoced and non-autorcorrel
+# OLS_Assumptions_Plot: plot OLS model assumptions: linearity, normality, homoced and non-autorcorrel
 # influence_cook_plot: spot points with outlier residuals (outliers) and high leverage that distort the model
-# cook_dist_plot: Cook distance measures the effect of deleting a given observation over the regression fit.
+# cook_dist_plot: cook distance measures the effect of deleting a given observation over the regression fit.
 # corr_mtx_des: description and correlation matrix to spot features that display multicollinearity
-# multivar_LR_plot: plots multiple univariate regressions vs Y to confirm if a univariate OLS couldd be
-# sufficient to explain the response variable.
+# multivar_LR_plot: plots multiple univar Y vs X regressionsto confirm if there's a relevant univ relationship.
+# R_avplot: Similar to R avplot, it compares Y vs X resids (y-axis) against each Xi vs all other xi resids.
+# vif_info_clean: get VIF per feature and obtain a clean df without features with VIF>threshold
+summary = pd.DataFrame({'function': ['normality_tests', 'OLS_Assumption_Tests', 'OLS_Assumptions_Plot', 'influence_cook_plot',
+                                     'cook_dist_plot', 'corr_mtx_des', 'multivar_LR_plot', 'R_avplot', 'vif_info_clean'],
+                        'DES': ['returns key statistics and multiple normality tests p-values',
+                                'check OLS model assumptions: linearity, normality, homoced and non-autorcorrel',
+                                'plot OLS model assumptions: linearity, normality, homoced and non-autorcorrel',
+                                'spot points with outlier residuals (outliers) and high leverage that distort the model',
+                                'cook distance measures the effect of deleting a given observation over the regression fit',
+                                'description and correlation matrix to spot features that display multicollinearity',
+                                'plots multiple univar Y vs X regressionsto confirm if there is a relevant univ relationship',
+                                'Similar to R avplot, it compares Y vs X resids (y-axis) against each Xi vs all other xi resids',
+                                'get VIF per feature and obtain a clean df without features with VIF>threshold']})
+summary = summary[summary.columns[::-1]]
 
 ##################################################################################################################
+
+
+def normality_tests(x, show_pv=True):
+    '''
+    Returns dataframe with different normality tests statistics and p-values
+    x = univariate array or multivariable dataframe
+    show_pv= True default. If False, it will show only stats.
+    '''
+    # show pv or statistic:
+    opt = [1 if show_pv == True else 0][0]
+    # check if x i univariate or multivariate df
+    try:
+        nvar = len(x.columns)
+    except:
+        nvar = 1
+
+    x = [pd.DataFrame(x) if nvar == 1 else x][0]
+
+    df = pd.DataFrame()
+
+    for i in range(nvar):
+        mean = np.mean(x.iloc[:, i])
+        std = np.std(x.iloc[:, i])
+        skew = stats.skew(x.iloc[:, i])
+        kurt = stats.kurtosis(x.iloc[:, i], fisher=False)
+        JB_test = list(stats.jarque_bera(x.iloc[:, i]))
+        SW_test = list(stats.shapiro(x.iloc[:, i]))
+        DA_test = list(stats.normaltest(x.iloc[:, i]))
+        if nvar > 1:
+            df[x.columns[i]] = pd.Series([mean, std, skew, kurt,
+                                          JB_test[opt], SW_test[opt], DA_test[opt]],
+                                         index=['mean', 'std', 'skew', 'kurt',
+                                                'JB_test', 'SW_test', 'DA_test'])
+        else:
+            df['x'] = pd.Series([mean, std, skew, kurt,
+                                 JB_test[opt], SW_test[opt], DA_test[opt]],
+                                index=['mean', 'std', 'skew', 'kurt',
+                                       'JB_test', 'SW_test', 'DA_test'])
+    print('Null Hypothesis: Normality - "average" row only museful with pvalues')
+    return df.round(2)
+
+#############################################################################################################
+
 
 def LR_Assumptions_Tests(x, y):
     '''
@@ -31,11 +89,6 @@ def LR_Assumptions_Tests(x, y):
     x = explanatory vars/features array/df
     y = dependent var array
     '''
-    import numpy as np
-    import pandas as pd
-    import statsmodels as sm
-    import statsmodels.api as sfm
-
     # unvariate or multivar LR:
     try:
         x.columns
@@ -93,17 +146,6 @@ def OLS_Assumptions_Plot(x, y, re_type='norm', met_mulcol='mean'):
     met_mulcol = method use to plot intra-corell between features. 'mean' default. The user can enter 'min' or
      'max' also to understand extreme correlation of a specific variable i against all the others. 
     '''
-
-    %matplotlib inline
-    import numpy as np
-    import pandas as pd
-    import seaborn as sns
-    import matplotlib.pyplot as plt
-    import statsmodels as sm
-    import statsmodels.api as sfm
-    from scipy import stats
-    from statsmodels.graphics.gofplots import ProbPlot
-    import warnings
 
     # unvariate or multivar LR:
     try:
@@ -359,9 +401,6 @@ def multivar_LR_plot(dataframe, y_name, logistic_=False, logx_=False):
         * logx = boolean type. Default False. If True it will transform X using log function before running the model.
 
     '''
-    import matplotlib.gridspec as gridspec
-    import matplotlib as mpl
-    import matplotlib.pyplot as plt
 
     Y = dataframe[y_name]
     X = dataframe.drop(y_name, 1)
@@ -397,3 +436,91 @@ def multivar_LR_plot(dataframe, y_name, logistic_=False, logx_=False):
                 tick.label1On = False
                 tick.label2On = True
     plt.tight_layout(pad=0, w_pad=0, h_pad=0)
+#########################################################################################
+
+
+def LR_avplot(dataframe, y_name, logistic_=False, logx_=False):
+    '''
+    Similar to R avplot, it compares our overall regression resids (y vs all xi, y-axis) against each 
+    feature residuals (resids from xi vs all other xis). When a clear linear relationship between y vs all xi 
+    resids and a particular xi vs all other xi resids is discovered, it can be interpreted as unique info coming 
+    from that that particular xi and therefore that variable has to remain in our ultimate model.
+
+        * dataframe = it contains both response (y) and feature (x) variables.
+        * y_name = name of the column for the response variable in the dataframe
+        * logistic = boolean type. Default False. True will allow to logistic regression of Y is binary.
+        * logx = boolean type. Default False. If True it will transform X using log function before running the model.
+
+    '''
+
+    # Define Y and X:
+    Y = dataframe[y_name]
+    X = dataframe.drop(y_name, 1)
+
+    cols = len(X.columns)
+    fig = plt.figure(figsize=(20, 33))
+    gs = gridspec.GridSpec(cols, 2)
+
+    # Y-axis regression:
+    model_fit = sfm.OLS(Y, sfm.add_constant(X)).fit()
+    model_residuals = model_fit.resid
+
+    for i in range(cols):
+        x_name = X.columns[i]
+        Y_n = X.iloc[:, i]
+        X_n = X.drop(x_name, 1)
+        X_model_fit = sfm.OLS(Y_n, sfm.add_constant(X_n)).fit()
+        X_model_residuals = X_model_fit.resid
+        X_model_R2 = X_model_fit.rsquared  # R2 of Xi v all other Xi
+        ax1 = plt.subplot(gs[i, 0])
+        sns.regplot(X_model_residuals, model_residuals, ax=ax1, logistic=logistic_, logx=logx_)
+        ax1.set_title('')
+        ax1.set_xlabel(x_name + ' | All others Xi => R2 = ' + str(round(X_model_R2, 1)))
+        ax1.set_ylabel('Y | All others Xi')
+        ylim = ax1.get_ylim()
+        if i != 0:
+            ax1.set_xticklabels([''])
+        else:
+            ax1.set_title('Residuals Comparison \n', size=15)
+            for tick in ax1.xaxis.get_major_ticks():
+                tick.label1On = False
+                tick.label2On = True
+    plt.show()
+
+#####################################################################################################
+
+
+def vif_info_clean(df, thresh=5, clean_df=False):
+    '''
+    Calculates VIF each feature in a pandas dataframe and user decided whether or not it wants a 
+    a clean dataframe with those features with VIF>threshold removed.
+    A constant is added to variance_inflation_factor or the results will be incorrect:
+    Params
+    ----------------
+    df =  dataframe
+    thresh =  maximum VIF value before the feature is removed from the dataframe
+    clean_df = False default. If "True" it returns a dataframe with VIF>threshold vars removed.
+    '''
+
+    const = sfm.add_constant(df)  # adding constant
+    cols = const.columns
+    variables = np.arange(const.shape[1])
+    vif_df = pd.Series([sm.stats.outliers_influence.variance_inflation_factor(const.values, i)
+                        for i in range(const.shape[1])],
+                       index=const.columns).to_frame()
+
+    vif_df = vif_df.sort_values(by=0, ascending=False).rename(columns={0: 'VIF'})
+    vif_df_x = vif_df.drop('const')
+    vif_df_t = vif_df_x[vif_df['VIF'] > thresh]
+
+    print('Features VIF > threshold: \n')
+    print('-*25')
+    print(vif_df_t)
+
+    if clean_df == False:
+        return vif_df
+    else:
+        col_to_drop = list(vif_df_t.index)
+        print('dropping : ', col_to_drop)
+        df = df.drop(col_to_drop, 1)
+        return df
