@@ -24,8 +24,11 @@ import matplotlib.gridspec as gridspec
 # multivar_LR_plot: plots multiple univar Y vs X regressionsto confirm if there's a relevant univ relationship.
 # R_avplot: Similar to R avplot, it compares Y vs X resids (y-axis) against each Xi vs all other xi resids.
 # vif_info_clean: get VIF per feature and obtain a clean df without features with VIF>threshold
+# dummy_generator: creates new dummy variables and returns a new df with original data plus new dummy variables
+
 summary = pd.DataFrame({'function': ['normality_tests', 'OLS_Assumption_Tests', 'OLS_Assumptions_Plot', 'influence_cook_plot',
-                                     'cook_dist_plot', 'corr_mtx_des', 'multivar_LR_plot', 'R_avplot', 'vif_info_clean'],
+                                     'cook_dist_plot', 'corr_mtx_des', 'multivar_LR_plot', 'R_avplot', 'vif_info_clean',
+                                     'dummy_generator'],
                         'DES': ['returns key statistics and multiple normality tests p-values',
                                 'check OLS model assumptions: linearity, normality, homoced and non-autorcorrel',
                                 'plot OLS model assumptions: linearity, normality, homoced and non-autorcorrel',
@@ -34,7 +37,9 @@ summary = pd.DataFrame({'function': ['normality_tests', 'OLS_Assumption_Tests', 
                                 'description and correlation matrix to spot features that display multicollinearity',
                                 'plots multiple univar Y vs X regressionsto confirm if there is a relevant univ relationship',
                                 'Similar to R avplot, it compares Y vs X resids (y-axis) against each Xi vs all other xi resids',
-                                'get VIF per feature and obtain a clean df without features with VIF>threshold']})
+                                'get VIF per feature and obtain a clean df without features with VIF>threshold',
+                                'creates new dummy variables and returns a new df with original data plus new dummy variables'
+                                ]})
 summary = summary[summary.columns[::-1]]
 
 ##################################################################################################################
@@ -84,7 +89,7 @@ def normality_tests(x, show_pv=True):
 
 def LR_Assumptions_Tests(x, y):
     '''
-    Helpful to understand whether or not the model meets the traditional 
+    Helpful to understand whether or not the model meets the traditional
     OLS model assumptions: linearity, normality, homoskedasticity and non-autocorrelation
     x = explanatory vars/features array/df
     y = dependent var array
@@ -141,10 +146,10 @@ def OLS_Assumptions_Plot(x, y, re_type='norm', met_mulcol='mean'):
     y = series with response  variabe
     re_type = residual type for heteroced analysis. Normalized resids('norm') as default. Othe options are:
             'standard' = residuals from our model
-            'abs_sq_norm' = absolute squared normalized resids  (default)        
+            'abs_sq_norm' = absolute squared normalized resids  (default)
             'norm' = normalized residuals aka studentized residuals
     met_mulcol = method use to plot intra-corell between features. 'mean' default. The user can enter 'min' or
-     'max' also to understand extreme correlation of a specific variable i against all the others. 
+     'max' also to understand extreme correlation of a specific variable i against all the others.
     '''
 
     # unvariate or multivar LR:
@@ -178,8 +183,8 @@ def OLS_Assumptions_Plot(x, y, re_type='norm', met_mulcol='mean'):
     def mcol_corr_plot(dataframe, method=met_mulcol):
         '''
         Plot the mean, max or min (user choice) average correlation of each feature against all the others:
-        method = mean default. The user can enter 'min' or 'max' also to understand extreme correlation of a 
-        specific variable i against all the others. 
+        method = mean default. The user can enter 'min' or 'max' also to understand extreme correlation of a
+        specific variable i against all the others.
         '''
         objects = dataframe.columns.values
         y_pos = np.arange(len(objects))
@@ -217,7 +222,7 @@ def OLS_Assumptions_Plot(x, y, re_type='norm', met_mulcol='mean'):
         Check residuals acf from y~x comparing transformed residuals vs fitted values
         reside_type = choose betweeen 3 options:
             'standard' = residuals from our model
-            'abs_sq_norm' = absolute squared normalized resids  (default)        
+            'abs_sq_norm' = absolute squared normalized resids  (default)
             'norm' = normalized residuals aka studentized residuals
         '''
         if resid_type == 'abs_sq_norm':
@@ -277,7 +282,7 @@ def OLS_Assumptions_Plot(x, y, re_type='norm', met_mulcol='mean'):
 
 def influence_cook_plot(model_fit, alpha_=0.05, criterion_="cooks"):
     '''
-    Data points with large residuals (outliers) and/or high leverage may distort the outcome 
+    Data points with large residuals (outliers) and/or high leverage may distort the outcome
     and accuracy of a regression. This chart represent obs leverage(x-axis) vs normalized (studentized)
     residuals (y-axis) with bubble size measuring cook distance:
     - Studentized residuals = normalized residuals from the model
@@ -285,7 +290,7 @@ def influence_cook_plot(model_fit, alpha_=0.05, criterion_="cooks"):
     - Cook distance = measures the effect of deleting a given observation
     params:
     - model = OLS fitted model
-    - alpha = to identify large studentized residuals. Large means abs(resid_studentized) > t.ppf(1-alpha/2, 
+    - alpha = to identify large studentized residuals. Large means abs(resid_studentized) > t.ppf(1-alpha/2,
     dof=results.df_resid)
     - criterion = 'cooks' activates cook distance as bubble size
     '''
@@ -298,7 +303,7 @@ def influence_cook_plot(model_fit, alpha_=0.05, criterion_="cooks"):
 def cook_dist_plot(model_fit):
     '''
     Cook distance = measures the effect of deleting a given observation
-    This plot shows if any outliers have influence over the regression fit. 
+    This plot shows if any outliers have influence over the regression fit.
     Anything outside the group and outside “Cook’s Distance” lines, may have an influential effect on model fit.
 
     '''
@@ -364,11 +369,11 @@ def cook_dist_plot(model_fit):
 def corr_mtx_des(dataframe, method_='pearson', per=1, threshold=0.7):
     '''
     Calculates correlation offering several options:
-        * method_= "pearson" default. The methods available are: 
+        * method_= "pearson" default. The methods available are:
             info: http://www.statisticssolutions.com/correlation-pearson-kendall-spearman/
             i) pearson: both vars should meet normality, linearity and homoscedasticity.
             ii) kendall: non-parametric test. Rank correlation measure.
-            iii) spearman: non-parametric test. Vars must be of ordinal type and both 
+            iii) spearman: non-parametric test. Vars must be of ordinal type and both
             need to be monotonically related to each other.
         * per = default 1. Number of periods to consider for calculation purporses. For instance,
             per =3 will allow to run 3-period/obs rolling correlations.
@@ -441,9 +446,9 @@ def multivar_LR_plot(dataframe, y_name, logistic_=False, logx_=False):
 
 def LR_avplot(dataframe, y_name, logistic_=False, logx_=False):
     '''
-    Similar to R avplot, it compares our overall regression resids (y vs all xi, y-axis) against each 
-    feature residuals (resids from xi vs all other xis). When a clear linear relationship between y vs all xi 
-    resids and a particular xi vs all other xi resids is discovered, it can be interpreted as unique info coming 
+    Similar to R avplot, it compares our overall regression resids (y vs all xi, y-axis) against each
+    feature residuals (resids from xi vs all other xis). When a clear linear relationship between y vs all xi
+    resids and a particular xi vs all other xi resids is discovered, it can be interpreted as unique info coming
     from that that particular xi and therefore that variable has to remain in our ultimate model.
 
         * dataframe = it contains both response (y) and feature (x) variables.
@@ -492,7 +497,7 @@ def LR_avplot(dataframe, y_name, logistic_=False, logx_=False):
 
 def vif_info_clean(df, thresh=5, clean_df=False):
     '''
-    Calculates VIF each feature in a pandas dataframe and user decided whether or not it wants a 
+    Calculates VIF each feature in a pandas dataframe and user decided whether or not it wants a
     a clean dataframe with those features with VIF>threshold removed.
     A constant is added to variance_inflation_factor or the results will be incorrect:
     Params
@@ -524,3 +529,18 @@ def vif_info_clean(df, thresh=5, clean_df=False):
         print('dropping : ', col_to_drop)
         df = df.drop(col_to_drop, 1)
         return df
+
+ #############################################################################################
+ def dummy_generator(dataframe,vars_dum):
+    '''
+    Creates new dummy variables and returns a new dataframe with original data plus new dummy variables. 
+    First variable for each dummy variable is deleted in order to have a ready predictor object for a model
+    dataframe = features
+    vars_dum = string or list of string with dataframe cols to be dummified.
+    '''
+    import pandas as pd
+    import numpy as np
+    df_n = pd.get_dummies(dataframe,columns=vars_dum,prefix=vars_dum, prefix_sep='__')
+    drop_var_lst =[i+'__'+str(sorted(dataframe[i])[0]) for i in vars_dum] 
+    df_n.drop(drop_var_lst,1, inplace = True)
+    return df_n
