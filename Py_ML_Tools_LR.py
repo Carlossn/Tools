@@ -1,5 +1,9 @@
 import numpy as np
 import pandas as pd
+from scipy.stats import mannwhitneyu
+from scipy.stats import wilcoxon
+from scipy.stats import kruskal
+from scipy.stats import friedmanchisquare
 import statsmodels as sm
 import statsmodels.api as sfm
 %matplotlib inline
@@ -11,10 +15,10 @@ from statsmodels.graphics.gofplots import ProbPlot
 import warnings
 import matplotlib.gridspec as gridspec
 
-
 ################################# LR MODEL TOOLS##########################################################
 # Functions HELP: import the file and load summary dataframe to check functions available
 ############
+# dist_similarity_test: distribution tests statistics and p-values for a list of variables (input in string format)
 # normality_tests: returns key statistics and multiple normality tests p-values for one or more vars
 # OLS_Assumption_Tests: check OLS model assumptions: linearity, normality, homoced and non-autorcorrel
 # OLS_Assumptions_Plot: plot OLS model assumptions: linearity, normality, homoced and non-autorcorrel
@@ -26,10 +30,11 @@ import matplotlib.gridspec as gridspec
 # vif_info_clean: get VIF per feature and obtain a clean df without features with VIF>threshold
 # dummy_generator: creates new dummy variables and returns a new df with original data plus new dummy variables
 
-summary = pd.DataFrame({'function': ['normality_tests', 'OLS_Assumption_Tests', 'OLS_Assumptions_Plot', 'influence_cook_plot',
+summary = pd.DataFrame({'function': ['dist_similarity_test', 'normality_tests', 'OLS_Assumption_Tests', 'OLS_Assumptions_Plot', 'influence_cook_plot',
                                      'cook_dist_plot', 'corr_mtx_des', 'multivar_LR_plot', 'R_avplot', 'vif_info_clean',
                                      'dummy_generator'],
-                        'DES': ['returns key statistics and multiple normality tests p-values',
+                        'DES': ['distribution tests statistics and p-values for a list of variables (input in string format)',
+                                'returns key statistics and multiple normality tests p-values',
                                 'check OLS model assumptions: linearity, normality, homoced and non-autorcorrel',
                                 'plot OLS model assumptions: linearity, normality, homoced and non-autorcorrel',
                                 'spot points with outlier residuals (outliers) and high leverage that distort the model',
@@ -41,6 +46,39 @@ summary = pd.DataFrame({'function': ['normality_tests', 'OLS_Assumption_Tests', 
                                 'creates new dummy variables and returns a new df with original data plus new dummy variables'
                                 ]})
 summary = summary[summary.columns[::-1]]
+
+
+#################################################################################################################
+def dist_similarity_test(*args):
+    '''
+    Returns multiple distribution tests statistics and p-values for a list of variables (input in string format)
+    Ho Null: samples have the same distribution
+    Tests performed are:
+     - MW_test = Mann-Whitney U
+     - W_test = Wilcoxon
+     - K_test = Kruskal
+     - F_test = Friedman
+    '''
+
+    nvar = len(args)
+    names = ', '.join(args)
+
+    if nvar > 2:
+        MW_test = eval('mannwhitneyu(' + names + ')')
+        W_test = [np.nan, np.nan]
+        K_test = eval('kruskal(' + names + ')')
+        F_test = eval('friedmanchisquare(' + names + ')')
+    else:
+        MW_test = eval('mannwhitneyu(' + names + ')')
+        W_test = eval('wilcoxon(' + names + ')')
+        K_test = eval('kruskal(' + names + ')')
+        F_test = [np.nan, np.nan]
+
+    df = pd.DataFrame([MW_test, W_test, K_test, F_test],
+                     index=['MW_test', 'W_test', 'K_test', 'F_test'])
+    print('Ho: Same Distribution')
+    return df
+
 
 ##################################################################################################################
 
