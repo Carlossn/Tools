@@ -18,6 +18,7 @@ import matplotlib.gridspec as gridspec
 ################################# LR MODEL TOOLS##########################################################
 # Functions HELP: import the file and load summary dataframe to check functions available
 ############
+# transf_comparison: Returns key stats, transformed series dataframe and a density plot comparison showing all the transformations
 # dist_similarity_test: distribution tests statistics and p-values for a list of variables (input in string format)
 # normality_tests: returns key statistics and multiple normality tests p-values for one or more vars
 # OLS_Assumption_Tests: check OLS model assumptions: linearity, normality, homoced and non-autorcorrel
@@ -29,11 +30,13 @@ import matplotlib.gridspec as gridspec
 # R_avplot: Similar to R avplot, it compares Y vs X resids (y-axis) against each Xi vs all other xi resids.
 # vif_info_clean: get VIF per feature and obtain a clean df without features with VIF>threshold
 # dummy_generator: creates new dummy variables and returns a new df with original data plus new dummy variables
+# DA_plot_classes: Returns key stats and normality tests as well as probability density functions.
 
-summary = pd.DataFrame({'function': ['dist_similarity_test', 'normality_tests', 'OLS_Assumption_Tests', 'OLS_Assumptions_Plot', 'influence_cook_plot',
+summary = pd.DataFrame({'function': ['transf_comparison','dist_similarity_test', 'normality_tests', 'OLS_Assumption_Tests', 'OLS_Assumptions_Plot', 'influence_cook_plot',
                                      'cook_dist_plot', 'corr_mtx_des', 'multivar_LR_plot', 'R_avplot', 'vif_info_clean',
-                                     'dummy_generator'],
-                        'DES': ['distribution tests statistics and p-values for a list of variables (input in string format)',
+                                     'dummy_generator', 'DA_plot_classes'],
+                        'DES': ['key stats, transformed series dataframe and a density plot comparison showing all the transformations',
+                                'distribution tests statistics and p-values for a list of variables (input in string format)',
                                 'returns key statistics and multiple normality tests p-values',
                                 'check OLS model assumptions: linearity, normality, homoced and non-autorcorrel',
                                 'plot OLS model assumptions: linearity, normality, homoced and non-autorcorrel',
@@ -43,12 +46,50 @@ summary = pd.DataFrame({'function': ['dist_similarity_test', 'normality_tests', 
                                 'plots multiple univar Y vs X regressionsto confirm if there is a relevant univ relationship',
                                 'Similar to R avplot, it compares Y vs X resids (y-axis) against each Xi vs all other xi resids',
                                 'get VIF per feature and obtain a clean df without features with VIF>threshold',
-                                'creates new dummy variables and returns a new df with original data plus new dummy variables'
+                                'creates new dummy variables and returns a new df with original data plus new dummy variables',
+                                'Returns key stats and normality tests as well as probability density functions'
                                 ]})
 summary = summary[summary.columns[::-1]]
 
+############################################################################################################
+def transf_comparison(y, df_only=False):
+    '''
+    Returns key stats, transformed series dataframe and a density plot comparison showing all the transformations
+    Transformations included: Box-Cox and power transformations for 0.5,1,2,3,4,5 powers.
+    Parameters:
+    y = series/array to be analyzed/transformed
+    df_only = 'False' default. If 'True' then it returns key stats and density plot comparison.
+    '''
+    
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import numpy as np
+    from scipy import stats
+    bc = stats.boxcox(y, lmbda=None, alpha=None)[0]
+    y_bc = stats.boxcox(y, lmbda=None, alpha=None)[0]
+    lambda_bc = bc[1]
+    df = pd.DataFrame({'Original': y,'Box-Cox':y_bc})
+    for i in [0.5,1,2,3,4,5]:
+        df[str(i)] = np.power(y,i)
 
-#################################################################################################################
+    df_n = pd.DataFrame([df.mean(axis=0), df.median(axis=0), df.std(axis=0), df.skew(axis=0), df.kurt(axis=0)+3],
+                        columns=['Original', 'Box-Cox','0.5','1','2','3','4','5'],
+                        index=['mean','med','std','skew','kurt'])
+    if df_only != True:
+        print(df_n.round(3))
+        print('*'*75)
+        print('Transformed Series below:')
+        print('note: optimal lambda for Box-Cox is %s'%(lambda_bc))
+        for col in df.columns:
+                # Draw the density plot
+                sns.distplot(df[col], hist = False, kde = True,
+                             kde_kws = {'linewidth': 3},
+                             label = col)
+                plt.xlim(-np.average(df_n.ix['std'])*2,np.average(df_n.ix['std'])*2)
+        return df
+    else:
+        return df
+############################################################################################################
 def dist_similarity_test(*args):
     '''
     Returns multiple distribution tests statistics and p-values for a list of variables (input in string format)
@@ -57,8 +98,7 @@ def dist_similarity_test(*args):
      - MW_test = Mann-Whitney U
      - W_test = Wilcoxon
      - K_test = Kruskal
-     - F_test = Friedman
-    '''
+     - F_test = Friedman    '''
 
     nvar = len(args)
     names = ', '.join(args)
@@ -125,12 +165,13 @@ def normality_tests(x, show_pv=True):
 #############################################################################################################
 
 
-def LR_Assumptions_Tests(x, y):
+def LR_Assumptions_Tests(x, y, type='lr'):
     '''
     Helpful to understand whether or not the model meets the traditional
     OLS model assumptions: linearity, normality, homoskedasticity and non-autocorrelation
     x = explanatory vars/features array/df
     y = dependent var array
+    type = 'lr' default for Linear Regression. For Logit (Logistic Regression) enter 'logit'
     '''
     # unvariate or multivar LR:
     try:
@@ -141,9 +182,12 @@ def LR_Assumptions_Tests(x, y):
         univariate = False
 
     # fitting model:
-    model_fit = sfm.OLS(y, sfm.add_constant(x)).fit()  # new regression fit as it works with sm.fit() only
+    if type == 'lr':
+        model_fit = sfm.OLS(y, sfm.add_constant(x)).fit()  # new regression fit as it works with sm.fit() only
+    else:
+        model_fit = sfm.Logit(y, sfm.add_constant(x)).fit()
     # model residuals
-    model_residuals = model_fit.resid
+    model_residuals = y - model_fit.predict(sfm.add_constant(x))
     # TESTS:
     # linearity Tests:
     if univariate == True:
@@ -582,3 +626,43 @@ def vif_info_clean(df, thresh=5, clean_df=False):
     drop_var_lst =[i+'__'+str(sorted(dataframe[i])[0]) for i in vars_dum] 
     df_n.drop(drop_var_lst,1, inplace = True)
     return df_n
+
+##################################################################################################################
+def LDA_plot_classes(y,x, joint_plot = True):
+    '''
+    Returns key stats and normality tests as well as probability density functions.
+    Useful to understand whether LDA (Linear Discrimination) assumptions of feature normality per class and 
+    same variance can be relied upon or we need to transform the data.
+    
+    Params
+    -------
+    y = series containing labelled series
+    x = feature related to y
+    joint_plot = 'True' defaults. To obtain separate plots use 'False'
+   
+    '''
+    labels = list(set(y))
+    df = pd.DataFrame()
+  
+    for lab in labels:
+        # Subset to the airline
+        subset = x[y == lab]
+        # Draw the density plot
+        sns.distplot(subset, hist = False, kde = True,
+                     kde_kws = {'linewidth': 3},
+                     label = lab)
+        mean = np.mean(subset)
+        std = np.std(subset)
+        skew = stats.skew(subset)
+        kurt = stats.kurtosis(subset, fisher=False)
+        JB_test = list(stats.jarque_bera(subset))
+        SW_test = list(stats.shapiro(subset))
+        DA_test = list(stats.normaltest(subset))
+        df[lab] = pd.Series([mean, std, skew, kurt,
+                                          JB_test[1], SW_test[1], DA_test[1], np.mean([JB_test[1], SW_test[1], DA_test[1]])], 
+                                         index=['mean', 'std', 'skew', 'kurt',
+                                                'JB_test_pv', 'SW_test_pv', 'DA_test_pv','mean_pv'])
+        if joint_plot!=True:
+            plt.show()
+    print('Ho: Normality')
+    return df 
