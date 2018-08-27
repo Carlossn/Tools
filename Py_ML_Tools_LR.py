@@ -18,6 +18,7 @@ import matplotlib.gridspec as gridspec
 ################################# LR MODEL TOOLS##########################################################
 # Functions HELP: import the file and load summary dataframe to check functions available
 ############
+# binarizer: Transfoms continue vars into binarized to be used in models that require binary features (e.g. BNB)
 # transf_comparison: Returns key stats, transformed series dataframe and a density plot comparison showing all the transformations
 # dist_similarity_test: distribution tests statistics and p-values for a list of variables (input in string format)
 # normality_tests: returns key statistics and multiple normality tests p-values for one or more vars
@@ -32,10 +33,11 @@ import matplotlib.gridspec as gridspec
 # dummy_generator: creates new dummy variables and returns a new df with original data plus new dummy variables
 # DA_plot_classes: Returns key stats and normality tests as well as probability density functions.
 
-summary = pd.DataFrame({'function': ['transf_comparison','dist_similarity_test', 'normality_tests', 'OLS_Assumption_Tests', 'OLS_Assumptions_Plot', 'influence_cook_plot',
+summary = pd.DataFrame({'function': ['binarizer','transf_comparison','dist_similarity_test', 'normality_tests', 'OLS_Assumption_Tests', 'OLS_Assumptions_Plot', 'influence_cook_plot',
                                      'cook_dist_plot', 'corr_mtx_des', 'multivar_LR_plot', 'R_avplot', 'vif_info_clean',
                                      'dummy_generator', 'DA_plot_classes'],
-                        'DES': ['key stats, transformed series dataframe and a density plot comparison showing all the transformations',
+                        'DES': ['Transfoms continue vars into binarized to be used in models that require binary features (e.g. BNB)',
+                                'key stats, transformed series dataframe and a density plot comparison showing all the transformations',
                                 'distribution tests statistics and p-values for a list of variables (input in string format)',
                                 'returns key statistics and multiple normality tests p-values',
                                 'check OLS model assumptions: linearity, normality, homoced and non-autorcorrel',
@@ -50,6 +52,47 @@ summary = pd.DataFrame({'function': ['transf_comparison','dist_similarity_test',
                                 'Returns key stats and normality tests as well as probability density functions'
                                 ]})
 summary = summary[summary.columns[::-1]]
+
+###############################################################################################################
+def binarizer(dataframe, method='median', std_mult=0, cut='above'):
+    '''
+    Returns binarized variables from those continue variables contained in dataframe.
+    Binarization is useful to run models that require binary features (e.g. Bernoulli Naive Bayes)
+    Parameters
+    -------------
+    dataframe = features to binarize
+    
+    method = 'Median' default. Provide method or float/integer to serve as cut-off threshold i.e. obs above cut-off 
+    will be 1, otherwise 0:
+        * mean = aritmetic average cut-off
+        * median = median cut-off
+        * float or integer value = 
+    
+    std_mult= 0 default. If entered an integer (-ve or +ve), it will transform the cut-off as:
+        cut-off = mean/median + std_mult * std
+    
+    cut = 'above' default. See below different meanings:
+        * 'above' = yields 1 when the obs is above method-std*std_mult
+        * 'below' = yields 1 when the obs is below method-std*std_mult
+        * 'range' = yields 1 when the obs is out the range (method-std*std_mult,method-std*std_mult)      
+    
+    '''
+    df = dataframe.copy()
+    median = np.median(df.dropna(),axis=0)
+    mean = np.mean(df.dropna(),axis=0)
+    method = [method if type(method)!=str else eval(method)][0]
+    std= np.std(df.dropna(),axis=0)
+    
+    if cut=='above':      
+        df[df>method+std_mult*std]=1
+    elif cut=='below':
+        df[df<method+std_mult*std]=1
+    else:
+        df[(df>method+abs(std_mult)*std)|(df<method-abs(std_mult)*std)]=1
+        
+    df[df!=1]=0
+
+    return df.astype(int)
 
 ############################################################################################################
 def transf_comparison(y, df_only=False):
