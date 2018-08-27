@@ -17,11 +17,13 @@ import matplotlib.gridspec as gridspec
 
 ################################# LR MODEL TOOLS##########################################################
 # Functions HELP: import the file and load summary dataframe to check functions available
-############
+#### Overall Functions:
+# dummy_generator: creates new dummy variables and returns a new df with original data plus new dummy variables
 # binarizer: Transfoms continue vars into binarized to be used in models that require binary features (e.g. BNB)
 # transf_comparison: Returns key stats, transformed series dataframe and a density plot comparison showing all the transformations
 # dist_similarity_test: distribution tests statistics and p-values for a list of variables (input in string format)
 # normality_tests: returns key statistics and multiple normality tests p-values for one or more vars
+#### OLS, GML and LDA Functions:
 # OLS_Assumption_Tests: check OLS model assumptions: linearity, normality, homoced and non-autorcorrel
 # OLS_Assumptions_Plot: plot OLS model assumptions: linearity, normality, homoced and non-autorcorrel
 # influence_cook_plot: spot points with outlier residuals (outliers) and high leverage that distort the model
@@ -30,13 +32,13 @@ import matplotlib.gridspec as gridspec
 # multivar_LR_plot: plots multiple univar Y vs X regressionsto confirm if there's a relevant univ relationship.
 # R_avplot: Similar to R avplot, it compares Y vs X resids (y-axis) against each Xi vs all other xi resids.
 # vif_info_clean: get VIF per feature and obtain a clean df without features with VIF>threshold
-# dummy_generator: creates new dummy variables and returns a new df with original data plus new dummy variables
 # DA_plot_classes: Returns key stats and normality tests as well as probability density functions.
 
-summary = pd.DataFrame({'function': ['binarizer','transf_comparison','dist_similarity_test', 'normality_tests', 'OLS_Assumption_Tests', 'OLS_Assumptions_Plot', 'influence_cook_plot',
+summary = pd.DataFrame({'function': ['dummy_generator','binarizer','transf_comparison','dist_similarity_test', 'normality_tests', 'OLS_Assumption_Tests', 'OLS_Assumptions_Plot', 'influence_cook_plot',
                                      'cook_dist_plot', 'corr_mtx_des', 'multivar_LR_plot', 'R_avplot', 'vif_info_clean',
-                                     'dummy_generator', 'DA_plot_classes'],
-                        'DES': ['Transfoms continue vars into binarized to be used in models that require binary features (e.g. BNB)',
+                                     'DA_plot_classes'],
+                        'DES': ['creates new dummy variables and returns a new df with original data plus new dummy variables',
+                                'Transfoms continue vars into binarized to be used in models that require binary features (e.g. BNB)',
                                 'key stats, transformed series dataframe and a density plot comparison showing all the transformations',
                                 'distribution tests statistics and p-values for a list of variables (input in string format)',
                                 'returns key statistics and multiple normality tests p-values',
@@ -47,8 +49,7 @@ summary = pd.DataFrame({'function': ['binarizer','transf_comparison','dist_simil
                                 'description and correlation matrix to spot features that display multicollinearity',
                                 'plots multiple univar Y vs X regressionsto confirm if there is a relevant univ relationship',
                                 'Similar to R avplot, it compares Y vs X resids (y-axis) against each Xi vs all other xi resids',
-                                'get VIF per feature and obtain a clean df without features with VIF>threshold',
-                                'creates new dummy variables and returns a new df with original data plus new dummy variables',
+                                'get VIF per feature and obtain a clean df without features with VIF>threshold',                                
                                 'Returns key stats and normality tests as well as probability density functions'
                                 ]})
 summary = summary[summary.columns[::-1]]
@@ -63,10 +64,10 @@ def binarizer(dataframe, method='median', std_mult=0, cut='above'):
     dataframe = features to binarize
     
     method = 'Median' default. Provide method or float/integer to serve as cut-off threshold i.e. obs above cut-off 
-    will be 1, otherwise 0:
+    will be 1, otherwise 0. Other methods are:
         * mean = aritmetic average cut-off
         * median = median cut-off
-        * float or integer value = 
+        * float or integer value = e.g. 5. However this can be non-relevant as each feature can have different units and sizes.
     
     std_mult= 0 default. If entered an integer (-ve or +ve), it will transform the cut-off as:
         cut-off = mean/median + std_mult * std
