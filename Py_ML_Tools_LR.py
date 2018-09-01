@@ -14,6 +14,8 @@ from scipy import stats
 from statsmodels.graphics.gofplots import ProbPlot
 import warnings
 import matplotlib.gridspec as gridspec
+import sklearn.grid_search as gs
+
 
 ################################# LR MODEL TOOLS##########################################################
 # Functions HELP: import the file and load summary dataframe to check functions available
@@ -33,10 +35,12 @@ import matplotlib.gridspec as gridspec
 # R_avplot: Similar to R avplot, it compares Y vs X resids (y-axis) against each Xi vs all other xi resids.
 # vif_info_clean: get VIF per feature and obtain a clean df without features with VIF>threshold
 # DA_plot_classes: Returns key stats and normality tests as well as probability density functions.
+# gridsearchCV_data_plot: Returns dataframe containing sklearn.grid_search.GridSearchCV.grid_scores_ attribute item info
+
 
 summary = pd.DataFrame({'function': ['dummy_generator','binarizer','transf_comparison','dist_similarity_test', 'normality_tests', 'OLS_Assumption_Tests', 'OLS_Assumptions_Plot', 'influence_cook_plot',
                                      'cook_dist_plot', 'corr_mtx_des', 'multivar_LR_plot', 'R_avplot', 'vif_info_clean',
-                                     'DA_plot_classes'],
+                                     'DA_plot_classes','gridsearchCV_data_plot'],
                         'DES': ['creates new dummy variables and returns a new df with original data plus new dummy variables',
                                 'Transfoms continue vars into binarized to be used in models that require binary features (e.g. BNB)',
                                 'key stats, transformed series dataframe and a density plot comparison showing all the transformations',
@@ -50,7 +54,8 @@ summary = pd.DataFrame({'function': ['dummy_generator','binarizer','transf_compa
                                 'plots multiple univar Y vs X regressionsto confirm if there is a relevant univ relationship',
                                 'Similar to R avplot, it compares Y vs X resids (y-axis) against each Xi vs all other xi resids',
                                 'get VIF per feature and obtain a clean df without features with VIF>threshold',                                
-                                'Returns key stats and normality tests as well as probability density functions'
+                                'Returns key stats and normality tests as well as probability density functions',
+                                'gridsearchCV_data_plot: Returns dataframe containing sklearn.grid_search.GridSearchCV.grid_scores_ attribute item info'
                                 ]})
 summary = summary[summary.columns[::-1]]
 
@@ -710,3 +715,39 @@ def LDA_plot_classes(y,x, joint_plot = True):
             plt.show()
     print('Ho: Normality')
     return df 
+
+##################################################################################################################
+
+def gridsearchCV_data_plot(grid_scores,y_var, x_var, return_data=True):
+    """
+    Returns dataframe containing sklearn.grid_search.GridSearchCV.grid_scores_ attribute item info where each row 
+    is a hyperparameter-fold combinatination showing 'score' in the final column.
+    Parameters
+    ------------
+    grid_score = attribute sklearn.grid_search.GridSearchCV.grid_scores_
+    y_var = Scoring metric to be plot in y-axis. Check your grid_score's 'criterion' options  to choose one.
+    e.g. y_var= 'gini' for classification problems
+    x_var = CV parameter to chart in x-axis. Check your grid_score CV parameters to choose one 
+    e.g. 'min_samples_leaf' for random forest gridsearch
+    return_data = True default. If False it will return only a plot with y_var, x_var data. 
+    note: if return_data =True then y_var and x_var can be ignored   
+    
+    """
+    rows = list()
+    for grid_score in grid_scores:
+        for fold, score in enumerate(grid_score.cv_validation_scores):
+            row = grid_score.parameters.copy()
+            row['fold'] = fold
+            row['score'] = score
+            rows.append(row)
+    df = pd.DataFrame(rows)
+    
+    if return_data==True:
+        return df
+    else:
+        x_ax = np.unique(df.loc[df['criterion']==y_var][x_var])
+        y_ax = df.loc[df['criterion']==y_var].groupby(x_var).mean()['score']
+        plt.plot(x_ax,y_ax)
+        plt.xlabel(x_var)
+        plt.ylabel('score')
+        plt.title('CV Score vs '+x_var)
