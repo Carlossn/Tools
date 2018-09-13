@@ -15,7 +15,7 @@ from statsmodels.graphics.gofplots import ProbPlot
 import warnings
 import matplotlib.gridspec as gridspec
 import sklearn.grid_search as gs
-
+from statsmodels.tsa.seasonal import seasonal_decompose
 
 ################################# LR MODEL TOOLS##########################################################
 # Functions HELP: import the file and load summary dataframe to check functions available
@@ -25,6 +25,7 @@ import sklearn.grid_search as gs
 # transf_comparison: Returns key stats, transformed series dataframe and a density plot comparison showing all the transformations
 # dist_similarity_test: distribution tests statistics and p-values for a list of variables (input in string format)
 # normality_tests: returns key statistics and multiple normality tests p-values for one or more vars
+# stationarity_tests: returns dataframe with stationarity tests' p-values 
 #### OLS, GML and LDA Functions:
 # OLS_Assumption_Tests: check OLS model assumptions: linearity, normality, homoced and non-autorcorrel
 # OLS_Assumptions_Plot: plot OLS model assumptions: linearity, normality, homoced and non-autorcorrel
@@ -36,9 +37,11 @@ import sklearn.grid_search as gs
 # vif_info_clean: get VIF per feature and obtain a clean df without features with VIF>threshold
 # DA_plot_classes: Returns key stats and normality tests as well as probability density functions.
 # gridsearchCV_data_plot: Returns dataframe containing sklearn.grid_search.GridSearchCV.grid_scores_ attribute item info
+#### Time Series  Functions:
+# 
 
-
-summary = pd.DataFrame({'function': ['dummy_generator','binarizer','transf_comparison','dist_similarity_test', 'normality_tests', 'OLS_Assumption_Tests', 'OLS_Assumptions_Plot', 'influence_cook_plot',
+summary = pd.DataFrame({'function': ['dummy_generator','binarizer','transf_comparison','dist_similarity_test', 'normality_tests','stationarity_tests', 
+                                     'OLS_Assumption_Tests', 'OLS_Assumptions_Plot', 'influence_cook_plot',
                                      'cook_dist_plot', 'corr_mtx_des', 'multivar_LR_plot', 'R_avplot', 'vif_info_clean',
                                      'DA_plot_classes','gridsearchCV_data_plot'],
                         'DES': ['creates new dummy variables and returns a new df with original data plus new dummy variables',
@@ -46,6 +49,7 @@ summary = pd.DataFrame({'function': ['dummy_generator','binarizer','transf_compa
                                 'key stats, transformed series dataframe and a density plot comparison showing all the transformations',
                                 'distribution tests statistics and p-values for a list of variables (input in string format)',
                                 'returns key statistics and multiple normality tests p-values',
+                                'returns dataframe with stationarity tests p-values',
                                 'check OLS model assumptions: linearity, normality, homoced and non-autorcorrel',
                                 'plot OLS model assumptions: linearity, normality, homoced and non-autorcorrel',
                                 'spot points with outlier residuals (outliers) and high leverage that distort the model',
@@ -210,6 +214,24 @@ def normality_tests(x, show_pv=True):
                                        'JB_test', 'SW_test', 'DA_test'])
     print('Null Hypothesis: Normality - "average" row only museful with pvalues')
     return df.round(2)
+############################################################################################################
+
+def stationarity_tests(series):
+    '''
+    Returns dataframe with stationarity tests' p-values 
+    
+    adf = augmented Dickey-Fuller. Ho: unit root = Non-Stationary 
+    kpss = KPSS(Kwiatkowski-Phillips-Schmidt-Shin). Ho: (trend) stationarity. Returned output is 1-pvalue.
+    ljb = Ljung-Box test. Ho: absence of serial correlation ~ Stationary. Number of lags used follow Hyndman: min(10, T/5). Returned output is 1-pvalue. 
+    http://robjhyndman.com/hyndsight/ljung-box-test 
+    ''' 
+    adf =  sm.tsa.stattools.adfuller(series)[1]
+    kpss = sm.tsa.stattools.kpss(series)[1]
+    ljb =  max(sm.stats.diagnostic.acorr_ljungbox(series, lags=min(10,len(series.index)/5), boxpierce=False)[1])
+    df = pd.DataFrame({'p-value':[adf, kpss, ljb]},index=['adf, Ho: Non-Stationary','kpss, Ho: Stationary',
+                                                          'ljb, Ho: Stationary'])
+    print('Reject Null Hypothesis for p-values < threshold (e.g. 0.01 or 0.05)')
+    return df.round(4)    
 
 #############################################################################################################
 
@@ -751,3 +773,45 @@ def gridsearchCV_data_plot(grid_scores,y_var, x_var, return_data=True):
         plt.xlabel(x_var)
         plt.ylabel('score')
         plt.title('CV Score vs '+x_var)
+
+
+################################# TIME SERIES TOOLS #############################################################
+##################################################################################################################
+
+def ts_decomposition(series, freq_=12, model_="additive", return_data=True):
+    '''
+    Decomposing the time series into trend, seasonality and residual:
+    Parameters
+    ----------
+    series = time series input with one columns and datetime index.
+    freq_ = 12 default (monthly data). Enter data frequency i.e. quarterly data will have freq_=4 
+    model_ = "additive" default. If seasonaility changes thoughout time use "multiplicative"
+    return_data = "False" default to deliver chart. If "True" is selected a dataframe with decomposition comps is returned.  
+    '''
+    decomposition = seasonal_decompose(np.array(series), freq = freq_, model=model_)
+
+    trend = decomposition.trend
+    seasonal = decomposition.seasonal
+    residual = decomposition.resid
+
+    df = pd.DataFrame([series.values, trend,seasonal, residual]).transpose()
+    df.columns = ['original','trend','seasonal','residual']
+    df.index = series.index
+    if return_data==False:
+        plt.figure(figsize=(12,8))
+        plt.subplot(411)
+        plt.plot(series, label='Original')
+        plt.legend(loc='best')
+        plt.subplot(412)
+        plt.plot(trend, label='Trend')
+        plt.legend(loc='best')
+        plt.subplot(413)
+        plt.plot(seasonal,label='Seasonality')
+        plt.legend(loc='best')
+        plt.subplot(414)
+        plt.plot(residual, label='Residuals')
+        plt.legend(loc='best')
+        plt.tight_layout()
+        plt.show()
+    else:
+        return df
