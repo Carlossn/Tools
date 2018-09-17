@@ -16,6 +16,8 @@ import warnings
 import matplotlib.gridspec as gridspec
 import sklearn.grid_search as gs
 from statsmodels.tsa.seasonal import seasonal_decompose
+import itertools
+import warnings
 
 ################################# LR MODEL TOOLS##########################################################
 # Functions HELP: import the file and load summary dataframe to check functions available
@@ -38,12 +40,13 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 # DA_plot_classes: Returns key stats and normality tests as well as probability density functions.
 # gridsearchCV_data_plot: Returns dataframe containing sklearn.grid_search.GridSearchCV.grid_scores_ attribute item info
 #### Time Series  Functions:
-# 
+# ts_decomposition: Decomposing the time series into trend, seasonality and residual
+# auto_sarimax: similar to R auto_arima returning a dataframe ranking with best SARIMAX models
 
 summary = pd.DataFrame({'function': ['dummy_generator','binarizer','transf_comparison','dist_similarity_test', 'normality_tests','stationarity_tests', 
                                      'OLS_Assumption_Tests', 'OLS_Assumptions_Plot', 'influence_cook_plot',
                                      'cook_dist_plot', 'corr_mtx_des', 'multivar_LR_plot', 'R_avplot', 'vif_info_clean',
-                                     'DA_plot_classes','gridsearchCV_data_plot'],
+                                     'DA_plot_classes','gridsearchCV_data_plot', 'ts_decomposition','auto_sarimax'],
                         'DES': ['creates new dummy variables and returns a new df with original data plus new dummy variables',
                                 'Transfoms continue vars into binarized to be used in models that require binary features (e.g. BNB)',
                                 'key stats, transformed series dataframe and a density plot comparison showing all the transformations',
@@ -59,7 +62,9 @@ summary = pd.DataFrame({'function': ['dummy_generator','binarizer','transf_compa
                                 'Similar to R avplot, it compares Y vs X resids (y-axis) against each Xi vs all other xi resids',
                                 'get VIF per feature and obtain a clean df without features with VIF>threshold',                                
                                 'Returns key stats and normality tests as well as probability density functions',
-                                'gridsearchCV_data_plot: Returns dataframe containing sklearn.grid_search.GridSearchCV.grid_scores_ attribute item info'
+                                'gridsearchCV_data_plot: Returns dataframe containing sklearn.grid_search.GridSearchCV.grid_scores_ attribute item info',
+                                'Decomposing the time series into trend, seasonality and residual',
+                                'similar to R auto_arima returning a dataframe ranking with best SARIMAX models'
                                 ]})
 summary = summary[summary.columns[::-1]]
 
@@ -815,3 +820,69 @@ def ts_decomposition(series, freq_=12, model_="additive", return_data=True):
         plt.show()
     else:
         return df
+
+#############################################################################################################
+
+def auto_sarimax(endog ,m ,exog=None, score='aic',verbose=False, max_AR =2, max_MA =2, max_Diff=2,
+                 trend_=None, tvar_regr = False, mle_regr=True):
+    '''
+    Similar to R's auto_arima returning a dataframe ranking with best SARIMAX models. Another alternative is pyramid-arima 
+    that offers more options, yet auto_sarimax works no matter what environment contrary to pyramid-arima.
+    
+    Parameters
+    ----------
+    endog = series with the dependent variable
+    m = period for seasonal differencing where m is the number of periods in each data cycle. Check ACF/PACF for clues.
+    exog = Array of exogenous regressors, shaped nobs x k.
+    score = criteria to choose model. Choose between 'aic' or 'bic'. 'aic' by default.
+    max_AR= maximum AR lag to be tested. 
+    max_AR= maximum AR lag to be tested.
+    max_AR= maximum times of differentiation to be tested.
+    trend : str{'n','c','t','ct'} or iterable, optional. Parameter controlling the deterministic trend polynomial :math:`A(t)`.
+        Can be specified as a string where 'c' indicates a constant (i.e. a degree zero component of the trend polynomial), 't' indicates a
+        linear trend with time, and 'ct' is both. Can also be specified as an iterable defining the polynomial as in `numpy.poly1d`, where
+        `[1,1,0,1]` would denote :math:`a + bt + ct^3`. Default is to not include a trend component
+    tvar_regr : boolean, optional. Used when an explanatory variables, `exog`, are provided provided
+        to select whether or not coefficients on the exogenous regressors are allowed to vary over time. Default is False.
+    mle_regr : boolean, optional.  Whether or not to use estimate the regression coefficients for the
+        exogenous variables as part of maximum likelihood estimation or through the Kalman filter (i.e. recursive least squares). If
+        `time_varying_regression` is True, this must be set to False. Default is True.
+    '''
+     # Define the p, d and q parameters to take any value between 0 and 2
+    p = range(0, max_AR)
+    d = range(0, max_MA)
+    q = range(0, max_Diff)
+    # Generate all different combinations of p, q and q triplets
+    pdq = list(itertools.product(p, d, q))
+    # Generate all different combinations of seasonal p, q and q triplets
+    seasonal_pdq = [(x[0], x[1], x[2], m) for x in pdq]
+
+    warnings.filterwarnings("ignore") # specify to ignore warning messages
+
+    df = pd.DataFrame(columns=['order','seasonal_order',score,'pv-stat','pv-homoced','pv-normal'])
+
+    for param in pdq: # for each (p,d,q) combination
+        for param_seasonal in seasonal_pdq: # for each seasonal (p,d,q,m) combination
+            try:
+                mod = sm.tsa.statespace.SARIMAX(endog,
+                                                order=param,
+                                                seasonal_order=param_seasonal,
+                                                enforce_stationarity=True,
+                                                enforce_invertibility=True,
+                                                trend=trend_,
+                                                time_varying_regression=tvar_regr,
+                                                mle_regression = mle_regr)
+                results = mod.fit()
+                score_ = eval('results.'+score) 
+                pv_stat = np.min(results.test_serial_correlation('ljungbox')[0][1])  # Ho: No serial correl = stationarity
+                pv_homoced = results.test_heteroskedasticity('breakvar')[0][1] # Ho: No Heterokesdasticity
+                pv_normal = sm.stats.stattools.jarque_bera(results.resid, axis=0)[1] # Ho: Normality
+                df2 = pd.DataFrame([[param, param_seasonal, score_, pv_stat, pv_homoced, pv_normal]],
+                                   columns=['order','seasonal_order',score, 'pv-stat','pv-homoced','pv-normal'])
+                df = pd.concat([df,df2])
+                if verbose==True:
+                    print('ARIMA{}x{} - AIC:{}'.format(param, param_seasonal, eval('results.'+score)))
+            except:
+                continue
+    print('pvalues are referenced as pv-nullhyp_name => pvalue<threshold => reject Null')
+    return df.sort_values(by=score,ascending=True)
