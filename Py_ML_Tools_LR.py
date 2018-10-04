@@ -18,6 +18,8 @@ import sklearn.grid_search as gs
 from statsmodels.tsa.seasonal import seasonal_decompose
 import itertools
 import warnings
+from sklearn.model_selection import TimeSeriesSplit
+
 
 ################################# LR MODEL TOOLS##########################################################
 # Functions HELP: import the file and load summary dataframe to check functions available
@@ -42,11 +44,15 @@ import warnings
 #### Time Series  Functions:
 # ts_decomposition: Decomposing the time series into trend, seasonality and residual
 # auto_sarimax: similar to R auto_arima returning a dataframe ranking with best SARIMAX models
+# ts_split_cv_nest: returns dictionary with training and validation indices that can be used in CV e.g. GridsearchCV()
+# ts_split_cv_fwd: returns dictionary with training and validation indices using one period Forward-Chaining to be used in CV e.g. GridsearchCV()
+# ts_split_cv_base: splits data into only 2 sets(training and validation) and returns indices that can be used in CV
 
 summary = pd.DataFrame({'function': ['dummy_generator','binarizer','transf_comparison','dist_similarity_test', 'normality_tests','stationarity_tests', 
                                      'OLS_Assumption_Tests', 'OLS_Assumptions_Plot', 'influence_cook_plot',
                                      'cook_dist_plot', 'corr_mtx_des', 'multivar_LR_plot', 'R_avplot', 'vif_info_clean',
-                                     'DA_plot_classes','gridsearchCV_data_plot', 'ts_decomposition','auto_sarimax'],
+                                     'DA_plot_classes','gridsearchCV_data_plot', 'ts_decomposition','auto_sarimax',
+                                     'ts_split_cv_nest','ts_split_cv_fwd','ts_split_cv_base'],
                         'DES': ['creates new dummy variables and returns a new df with original data plus new dummy variables',
                                 'Transfoms continue vars into binarized to be used in models that require binary features (e.g. BNB)',
                                 'key stats, transformed series dataframe and a density plot comparison showing all the transformations',
@@ -64,7 +70,10 @@ summary = pd.DataFrame({'function': ['dummy_generator','binarizer','transf_compa
                                 'Returns key stats and normality tests as well as probability density functions',
                                 'gridsearchCV_data_plot: Returns dataframe containing sklearn.grid_search.GridSearchCV.grid_scores_ attribute item info',
                                 'Decomposing the time series into trend, seasonality and residual',
-                                'similar to R auto_arima returning a dataframe ranking with best SARIMAX models'
+                                'similar to R auto_arima returning a dataframe ranking with best SARIMAX models',
+                                'returns dictionary with training and validation indices that can be used in CV e.g. GridsearchCV()',
+                                'returns dictionary with training and validation indices using one period Forward-Chaining to be used in CV e.g. GridsearchCV()',
+                                'splits data into only 2 sets(training and validation) and returns indices that can be used in CV'
                                 ]})
 summary = summary[summary.columns[::-1]]
 
@@ -886,3 +895,79 @@ def auto_sarimax(endog ,m ,exog=None, score='aic',verbose=False, max_AR =2, max_
                 continue
     print('pvalues are referenced as pv-nullhyp_name => pvalue<threshold => reject Null')
     return df.sort_values(by=score,ascending=True)
+
+######################################################################################################
+
+def ts_split_cv_nest(df, n_splits_=3, max_train_size_=None):
+    '''
+    Returns dictionary with training and validation indices that can be used in CV e.g. GridsearchCV()
+    Dataframe time series split is carried out using nestted
+    Parameters
+    ----------
+    df = dataframe with both endoneous and exogenous time series.
+    n_splits_= 3 default. Number of sets to be generated.
+    max_train_size_= None. If given it ensures a minimum size per each train split set overriding n_splits_ parameter.    
+    '''
+    tscv = TimeSeriesSplit(n_splits_, max_train_size=max_train_size_) # you can decide the n_splits or max_train_size (max sample size for a single training set)
+    # generating list of list of train/test indices
+    list_=list()
+    for n, (train_index, val_index) in enumerate(tscv.split(df)):
+        list_.append([{'train_'+str(n):train_index},{'validation_'+str(n):val_index}]) # list of lists containing 2 dict per split: train and validation
+    # dictionary format:
+    d_idx={}
+    for l in list_:
+        for l_ in l:
+            d_idx.update(l_)
+    return d_idx  
+
+##########################################################################################################
+
+def ts_split_cv_fwd(df):
+    '''
+    Returns dictionary with training and validation indices using Day Forward-Chaining that can be used in CV 
+    e.g. GridsearchCV()
+    Parameters
+    ----------
+    df = dataframe with both endoneous and exogenous time series.
+    '''
+    n_splits_ = df.shape[0]-1
+    tscv = TimeSeriesSplit(n_splits_) # you can decide the n_splits or max_train_size (max sample size for a single training set)
+    # generating list of list of train/test indices
+    list_=list()
+    for n, (train_index, val_index) in enumerate(tscv.split(df)):
+        list_.append([{'train_'+str(n):train_index},{'validation_'+str(n):val_index[0]}]) # list of lists containing 2 dict per split: train and validation
+    # dictionary format:
+    d_idx={}
+    for l in list_:
+        for l_ in l:
+            d_idx.update(l_)
+    return d_idx  
+
+###########################################################################################################
+
+def ts_split_cv_base(df, train_portion=0.66, date_cut= None):
+    '''
+    Returns dictionary with training and validation indices that can be used in CV
+    This is a simple function that splits df into 2 parts only.
+
+    Parameters
+    ----------
+    df = dataframe with time series index
+    train_portion = 0.66 default. Portion to be used as train CV set
+    date_cut = optional. If date string included, it will override train_portion.
+    
+    '''
+    if date_cut ==None:
+        train_size = int(df.shape[0] * train_portion)
+        train = df.ix[0:train_size].index.map((lambda x: df.index.get_loc(x)))
+        val = df.ix[train_size:df.shape[0]].index.map((lambda x: df.index.get_loc(x)))
+    else:
+        start = df.index[0]
+        end = df.index[-1] 
+        tr_cut_date = datetime.datetime.strptime(date_cut,'%Y-%m-%d').date()
+        t_delta = df.index[1]- df.index[0]
+        val_cut_date = tr_cut_date + t_delta
+        train = df.ix[start:tr_cut_date].index.map((lambda x: df.index.get_loc(x)))
+        val = df.ix[val_cut_date:end].index.map((lambda x: df.index.get_loc(x)))
+    
+    return {'train':train, 'validation': val}

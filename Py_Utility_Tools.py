@@ -8,10 +8,13 @@ import itertools
 # offset:Returns a dataframe range or value that is a given number of rows and cols from a coord reference tuple
 #### AUXILIAR FUNCTIONS:
 # df_filter_var_type: Feature filtering using type() function based on user choice i.e. True(Numeric) or False (String)
-summary = pd.DataFrame({'function': ['match','offset','df_filter_var_type'],
+# df_filter_rc_by_string: Returns a dataframe with only the rows(cols) and index(col_names) that contain specific strings 
+
+summary = pd.DataFrame({'function': ['match','offset','df_filter_var_type', 'df_filter_rc_by_string'],
                         'DES': ['Returns list of tuples (row,col) with the dataframe coordinates of the value sought',
                                 'Returns a dataframe range or value that is a given number of rows and cols from a coord reference tuple',
-                                'Feature filtering using type() function based on user choice i.e. True(Numeric) or False (String)']})
+                                'Feature filtering using type() function based on user choice i.e. True(Numeric) or False (String)',
+                                'Returns a dataframe with only the rows(cols) and index(col_names) that contain specific strings']})
 summary = summary[summary.columns[::-1]]
 
 ############### EXCEL-LIKE FUNCTIONS:
@@ -56,3 +59,14 @@ def df_filter_var_type(dataframe, numeric=True):
         type_idx= [i==str for i in type_list]
         df = dataframe.iloc[:,type_idx]
     return df
+
+##########################################################
+def df_filter_rc_by_string(dataframe,str_r,str_c):
+    '''
+    Returns a dataframe with only the rows(cols) and index(col_names) that contain specific strings 
+    Parameters
+    ----------
+    str_r = string to be sought in rows
+    str_c = string to be sought in cols
+    '''
+    return dataframe.filter(regex = str_c).filter(like=str_r, axis=0)
