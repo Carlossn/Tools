@@ -2,8 +2,23 @@
 ###### Functions created per Asset Class or source
 # These functions are user_friendly versions from http://pandas-datareader.readthedocs.io/en/latest/remote_data.html
 
+summary = pd.DataFrame({'function': ['Data_Yahoo','Data_Quandl','Data_FRED', 'Data_FF','Data_FF_search','Data_WB', 'Data_Eurostat','Data_bulk'],
+                        'DES': ['Download yahoo data when web.Datareader was down',
+                                'Download data available in quandl api (requies API details)',
+                                'Download data from Federal Reserve. Function works thanks to fredapi library: pip install fredapi ',
+                                'RDownload data from FF (Fama French) datareader source',
+                                'Search specific Summary of sets available to download using DataReader_FF function',
+                                'Download series from WB database', 'Download series from Eurostat database',
+                                'Dowload data from multiple tickers and stores(appends) it into new(existent) HDFS file'
+                                ]})
+summary = summary[summary.columns[::-1]]
+
 # Yahoo Data: fixed using fix_yahoo_finance package:
 def Data_Yahoo(ticker,start,end, source='yahoo',price_only=True):
+    '''
+    Developed to download yahoo data when web.Datareader was down.  
+
+    '''
     from pandas_datareader import data
 	import pandas as pd
 	import fix_yahoo_finance as yf 
@@ -21,6 +36,7 @@ def Data_Yahoo(ticker,start,end, source='yahoo',price_only=True):
 # Quandl Data: using Quandl libary => NOT FINISHED
 def Data_Quandl(symbol,start,end, address, key_file_name, ql_source='WIKI/PRICES'):
     '''
+    Download data available in quandl api (requies API details)
     ql_source = select quandl source. US Stocks (WIKI/PRICES) by default
     address = 'c/folder_name/.../folder_name', select folder path for API_key.ini  
     key_file_name = .ini file located in "address" path that contains API key with the next format:
@@ -69,6 +85,7 @@ def Data_FRED(symbol, start, end, address,key_file_name, revised_data=True):
 # Fama-French Data: Federal Reserve Data 
 def Data_FF(series_name,start,encode):
     '''
+    Download data from FF (Fama French) datareader source. 
     data info in http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html
     type get_available_datasets() to get series_name possibilities
     '''
@@ -110,7 +127,7 @@ def Data_WB(series_name, country_list, start,end):
     data = wb.download(indicator=series_name, country=country_list, start=start, end=end)
     return data
 
-# World Bank Data: source World Bank
+# Eurostat: source World Bank
 def Data_Eurostat(series_name, start,end):
     '''
     Download series from Eurostat database
@@ -124,3 +141,45 @@ def Data_Eurostat(series_name, start,end):
     data = web.DataReader(series_name, 'eurostat',start,end)
     return data
  
+ # Bulk Download: source Yahoo
+def Data_bulk(tickers,start_, end_,  hdfs_name, price_only=True, source='yahoo'):
+    '''
+    Given a list of yahoo tickers, the function dowloads data and either stores into HDFS file or appends the
+    the data to an existing HDFS database-like file easy to access via pandas or Pytables.
+    
+    This function solves issues inherent in DAtareader function related to bulk download of tickers. 
+        
+    Params
+    ------
+    price_only = True. If True it only yields "Adj Close" data per each ticker.
+    hdfs_name = h5 file name to store each ticker. Every ticker will have a different key assigned.
+    '''
+    import datetime
+    import numpy as np
+    import pandas as pd
+    import pandas_datareader.data as web # get data
+    import zmq
+    import datetime
+    
+    store = pd.HDFStore(hdfs_name+'.h5') # opens or create a new hdfs file name if is not existent.
+    
+    yr_diff = dt.datetime.strptime(e,'%Y-%M-%d').year - dt.datetime.strptime(s,'%Y-%M-%d').year
+    dt_idx = pd.date_range(start_,end_, periods=yr_diff).date # start_date to test and grab the first available
+    
+    for t in tickers:
+        try:
+            for d in dt_idx: # test inception dates with data
+                try:
+                    data = web.DataReader(t, data_source=source, start=d, end=end_)
+                    break
+                except:
+                    continue
+        except:
+            print(t, 'error: data not available')
+        
+        if price_only==True:
+            data = data[['Adj Close']]              
+        
+        data = data.astype('float64') # transform to float64 to avoid compatibility problems for future appending to h5 
+        store.append(t,data,'table') # store or append in h5 file
+    store.close()
