@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import itertools
+import numpy as np
+from pylab import plt, mpl
 
 ##############################EXCEL & AUXILIARY FUNCTIONS###########################################################
 #### EXCEL-LIKE FUNCTIONS:
@@ -9,12 +11,13 @@ import itertools
 #### AUXILIAR FUNCTIONS:
 # df_filter_var_type: Feature filtering using type() function based on user choice i.e. True(Numeric) or False (String)
 # df_filter_rc_by_string: Returns a dataframe with only the rows(cols) and index(col_names) that contain specific strings 
-
-summary = pd.DataFrame({'function': ['match','offset','df_filter_var_type', 'df_filter_rc_by_string'],
+# create_plot: Generate plot for multiple series X and Y
+summary = pd.DataFrame({'function': ['match','offset','df_filter_var_type', 'df_filter_rc_by_string','create_plot'],
                         'DES': ['Returns list of tuples (row,col) with the dataframe coordinates of the value sought',
                                 'Returns a dataframe range or value that is a given number of rows and cols from a coord reference tuple',
                                 'Feature filtering using type() function based on user choice i.e. True(Numeric) or False (String)',
-                                'Returns a dataframe with only the rows(cols) and index(col_names) that contain specific strings']})
+                                'Returns a dataframe with only the rows(cols) and index(col_names) that contain specific strings',
+                                'Generate plot for multiple series X and Y']})
 summary = summary[summary.columns[::-1]]
 
 ############### EXCEL-LIKE FUNCTIONS:
@@ -70,3 +73,22 @@ def df_filter_rc_by_string(dataframe,str_r,str_c):
     str_c = string to be sought in cols
     '''
     return dataframe.filter(regex = str_c).filter(like=str_r, axis=0)
+
+############################################################
+def create_plot(x, y, styles, labels, axlabels):
+    '''
+    Generate plot for multiple series X and Y
+    
+    Parameters
+    ---------
+    x = List format. List of Time Series Arrays representing x-axis
+    y = List format. List of Time Series Arrays representing y-axis
+    labels = List format. e.g. ['b','b'] if we have two series x and y
+    axlabels = List format. Define x-axis and y-axis name to be displayed. 
+    '''
+    plt.figure(figsize=(10, 6))
+    for i in range(len(x)):
+        plt.plot(x[i], y[i], styles[i], label=labels[i])
+        plt.xlabel(axlabels[0])
+        plt.ylabel(axlabels[1])
+    plt.legend(loc=0)
